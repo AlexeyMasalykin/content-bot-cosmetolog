@@ -6,7 +6,7 @@ from datetime import datetime
 from state import scheduled_posts, store_lock, save_state
 from utils.tg_utils import admin_keyboard, topics_approval_keyboard
 from utils.openai_utils import generate_topics
-from scheduler import content_scheduler
+from scheduler import init_scheduler
 
 log = logging.getLogger("tg-vk-bot")
 
@@ -19,8 +19,9 @@ def register(bot):
         chat_id = msg.chat.id
         
         # Устанавливаем этот чат как админский
-        if content_scheduler:
-            content_scheduler.set_admin_chat_id(chat_id)
+        scheduler = init_scheduler(None)
+        if scheduler:
+            scheduler.set_admin_chat_id(chat_id)
         
         message = "🔧 **Админская панель**\n\n"
         message += "Управление планированием контента и публикацией постов."
@@ -37,9 +38,10 @@ def register(bot):
         """Запускает планировщик"""
         chat_id = msg.chat.id
         
-        if content_scheduler:
-            content_scheduler.set_admin_chat_id(chat_id)
-            content_scheduler.start_scheduler()
+        scheduler = init_scheduler(None)
+        if scheduler:
+            scheduler.set_admin_chat_id(chat_id)
+            scheduler.start_scheduler()
             bot.send_message(
                 chat_id,
                 "✅ Планировщик запущен!\n\n"
@@ -55,8 +57,9 @@ def register(bot):
         """Останавливает планировщик"""
         chat_id = msg.chat.id
         
-        if content_scheduler:
-            content_scheduler.stop_scheduler()
+        scheduler = init_scheduler(None)
+        if scheduler:
+            scheduler.stop_scheduler()
             bot.send_message(chat_id, "⏹️ Планировщик остановлен")
         else:
             bot.send_message(chat_id, "❌ Планировщик не найден")
@@ -89,7 +92,8 @@ def register(bot):
         message += f"📤 Опубликованные посты: {len(published_posts)}\n\n"
         
         # Планировщик
-        scheduler_status = "🟢 Работает" if (content_scheduler and content_scheduler.running) else "🔴 Остановлен"
+        scheduler = init_scheduler(None)
+        scheduler_status = "🟢 Работает" if (scheduler and scheduler.running) else "🔴 Остановлен"
         message += f"🤖 Планировщик: {scheduler_status}\n"
         
         # Следующая публикация

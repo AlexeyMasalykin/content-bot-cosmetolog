@@ -19,6 +19,11 @@ bot = TeleBot(BOT_TOKEN)
 # Инициализация планировщика
 content_scheduler = init_scheduler(bot)
 
+# Автоматический запуск планировщика при старте бота
+log.info("Starting content scheduler automatically...")
+content_scheduler.start_scheduler()
+log.info("Content scheduler started successfully")
+
 # Регистрация обработчиков (команды регистрируются первыми)
 admin.register(bot)
 content_planning.register(bot)

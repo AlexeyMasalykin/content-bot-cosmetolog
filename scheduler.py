@@ -249,9 +249,9 @@ class ContentScheduler:
 # Глобальный экземпляр планировщика
 content_scheduler = None
 
-def init_scheduler(bot):
+def init_scheduler(bot=None):
     """Инициализирует глобальный планировщик"""
     global content_scheduler
-    if content_scheduler is None:
+    if content_scheduler is None and bot is not None:
         content_scheduler = ContentScheduler(bot)
     return content_scheduler
