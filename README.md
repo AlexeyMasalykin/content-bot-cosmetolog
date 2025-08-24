@@ -50,8 +50,8 @@
 
 ### 1. Клонирование репозитория
 ```bash
-git clone https://github.com/your-username/content-bot.git
-cd content-bot
+git clone https://github.com/AlexeyMasalykin/content-bot-cosmetolog.git
+cd content-bot-cosmetolog
 ```
 
 ### 2. Установка зависимостей
@@ -80,7 +80,7 @@ python bot.py
 ## 🏗️ Структура проекта
 
 ```
-content-bot/
+content-bot-cosmetolog/
 ├── bot.py                 # Основной файл бота
 ├── scheduler.py           # Планировщик задач
 ├── config.py             # Конфигурация
@@ -128,12 +128,12 @@ content-bot/
 
 ```bash
 # Сборка образа
-docker build -t content-bot .
+docker build -t content-bot-cosmetolog .
 
 # Запуск контейнера
-docker run -d --name content-bot \
+docker run -d --name content-bot-cosmetolog \
   --env-file .env \
-  content-bot
+  content-bot-cosmetolog
 ```
 
 ## 📊 Мониторинг
@@ -157,7 +157,7 @@ docker run -d --name content-bot \
 ## 🆘 Поддержка
 
 Если у вас есть вопросы или проблемы:
-- Создайте [Issue](https://github.com/your-username/content-bot/issues)
+- Создайте [Issue](https://github.com/AlexeyMasalykin/content-bot-cosmetolog/issues)
 - Обратитесь к [документации](CONTENT_PLANNING.md)
 
 ## ⭐ Звезды

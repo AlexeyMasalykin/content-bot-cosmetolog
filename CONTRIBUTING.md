@@ -15,8 +15,8 @@
    ```bash
    # Перейдите на GitHub и нажмите "Fork"
    # Затем клонируйте ваш форк
-   git clone https://github.com/YOUR_USERNAME/content-bot.git
-   cd content-bot
+   git clone https://github.com/AlexeyMasalykin/content-bot-cosmetolog.git
+   cd content-bot-cosmetolog
    ```
 
 2. **Создайте виртуальное окружение**
