@@ -20,8 +20,13 @@ class VKPublisher:
         self.vk_api_key = vk_api_key
         self.group_id = group_id
 
-    def _vk_call(self, method: str, params: Optional[Dict[str, Any]] = None,
-                 files: Optional[Dict[str, Any]] = None, max_retries: int = 4) -> Dict[str, Any]:
+    def _vk_call(
+        self,
+        method: str,
+        params: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+        max_retries: int = 4,
+    ) -> Dict[str, Any]:
         """
         Вызов метода VK API с базовой retry-логикой.
         """
@@ -44,14 +49,14 @@ class VKPublisher:
                     r = requests.post(f"{VK_API}/{method}", params=params, files=files, timeout=HTTP_TIMEOUT)
                 log.info(f"VK API {method} response status: {r.status_code}")
                 log.info(f"VK API {method} response text (first 200 chars): {r.text[:200]}")
-                
+
                 if not r.text.strip():
                     log.error(f"VK API {method} returned empty response")
                     if attempt < max_retries:
                         time.sleep(0.8 * attempt)
                         continue
                     raise VkApiError(f"VK API returned empty response for {method}")
-                
+
                 data = r.json()
             except requests.exceptions.JSONDecodeError as e:
                 log.error(f"VK API {method} JSON decode error. Response: {r.text[:500]}")
@@ -97,39 +102,42 @@ class VKPublisher:
             image_data = image_bytes
         else:
             raise ValueError("Не передано изображение для загрузки")
-        
+
         # Проверяем размер изображения
         if len(image_data) == 0:
             raise VkApiError("Image data is empty")
         if len(image_data) > 50 * 1024 * 1024:  # 50MB limit
             raise VkApiError(f"Image too large: {len(image_data)} bytes")
-        
+
         log.info(f"VK image size: {len(image_data)} bytes")
 
         # 3. Загрузить на сервер VK
         try:
-            upload_response = requests.post(upload_url,
-                                            files={"photo": ("image.jpg", io.BytesIO(image_data), "image/jpeg")},
-                                            timeout=HTTP_TIMEOUT).json()
-            
+            upload_response = requests.post(
+                upload_url, files={"photo": ("image.jpg", io.BytesIO(image_data), "image/jpeg")}, timeout=HTTP_TIMEOUT
+            ).json()
+
             # Проверяем ответ загрузки
             if "photo" not in upload_response or not upload_response["photo"]:
                 raise VkApiError(f"VK upload failed: {upload_response}")
-                
+
             log.info(f"VK upload successful: {upload_response.keys()}")
-            
+
         except requests.exceptions.RequestException as e:
             raise VkApiError(f"VK upload request failed: {e}")
         except ValueError as e:
             raise VkApiError(f"VK upload response not JSON: {e}")
 
         # 4. Сохранить фото
-        save_response = self._vk_call("photos.saveWallPhoto", params={
-            "group_id": self.group_id,
-            "photo": upload_response["photo"],
-            "server": upload_response["server"],
-            "hash": upload_response["hash"]
-        })
+        save_response = self._vk_call(
+            "photos.saveWallPhoto",
+            params={
+                "group_id": self.group_id,
+                "photo": upload_response["photo"],
+                "server": upload_response["server"],
+                "hash": upload_response["hash"],
+            },
+        )
 
         ph = save_response["response"][0]
         return f"photo{ph['owner_id']}_{ph['id']}"
@@ -138,11 +146,7 @@ class VKPublisher:
         """
         Публикация поста в VK с текстом и опционально картинкой.
         """
-        params = {
-            "from_group": 1,
-            "owner_id": f"-{self.group_id}",
-            "message": content
-        }
+        params = {"from_group": 1, "owner_id": f"-{self.group_id}", "message": content}
         if image_url or image_bytes:
             attachment = self.upload_photo(image_url=image_url, image_bytes=image_bytes)
             params["attachments"] = attachment
@@ -178,7 +182,7 @@ def vk_publish_with_image_required(group_id: str, image_bytes: bytes, text: str)
     Публикует пост с изображением в VK с гарантией наличия картинки.
     Пробует разные стратегии, но всегда с картинкой.
     """
-    
+
     # Стратегия 1: Обычная публикация с картинкой
     try:
         log.info("VK Strategy 1: Normal photo+text post")
@@ -188,28 +192,27 @@ def vk_publish_with_image_required(group_id: str, image_bytes: bytes, text: str)
         return post_id
     except Exception as e:
         log.warning(f"VK Strategy 1 failed: {e}")
-    
+
     # Стратегия 2: Сначала загружаем картинку, потом публикуем
     try:
         log.info("VK Strategy 2: Upload image first, then post")
         attachment = vk_publisher.upload_photo(image_bytes=image_bytes)
-        resp = vk_publisher._vk_call("wall.post", params={
-            "owner_id": f"-{group_id}",
-            "message": text,
-            "attachments": attachment
-        })
+        resp = vk_publisher._vk_call(
+            "wall.post", params={"owner_id": f"-{group_id}", "message": text, "attachments": attachment}
+        )
         post_id = int(resp["response"]["post_id"])
         log.info(f"VK Strategy 2 success: post_id={post_id}")
         return post_id
     except Exception as e:
         log.warning(f"VK Strategy 2 failed: {e}")
-    
+
     # Стратегия 3: Минимальный текст с картинкой
     try:
         log.info("VK Strategy 3: Minimal text with image")
         # Импортируем здесь, чтобы избежать циклического импорта
         import re
-        clean_text = re.sub(r'[^\w\s\.\,\!\?\-\n]', '', text)  # Убираем спецсимволы
+
+        clean_text = re.sub(r"[^\w\s\.\,\!\?\-\n]", "", text)  # Убираем спецсимволы
         short_text = clean_text[:500] + "..." if len(clean_text) > 500 else clean_text
         resp = vk_publisher.publish_post(short_text, image_bytes=image_bytes)
         post_id = int(resp["response"]["post_id"])
@@ -217,7 +220,7 @@ def vk_publish_with_image_required(group_id: str, image_bytes: bytes, text: str)
         return post_id
     except Exception as e:
         log.warning(f"VK Strategy 3 failed: {e}")
-    
+
     # Стратегия 4: Только картинка с минимальным текстом
     try:
         log.info("VK Strategy 4: Image with minimal text")
@@ -228,6 +231,6 @@ def vk_publish_with_image_required(group_id: str, image_bytes: bytes, text: str)
         return post_id
     except Exception as e:
         log.warning(f"VK Strategy 4 failed: {e}")
-    
+
     # Если все стратегии не сработали
     raise VkApiError("Не удалось опубликовать пост с картинкой ни одним способом")

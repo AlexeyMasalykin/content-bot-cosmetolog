@@ -2,11 +2,11 @@
 from telebot.types import CallbackQuery
 from config import TELEGRAM_CHANNEL_ID
 from state import user_drafts, store_lock
-from utils.tg_utils import truncate_caption, send_post_with_image
-import io
+from utils.tg_utils import send_post_with_image
 import logging
 
 log = logging.getLogger("tg-vk-bot")
+
 
 def register(bot):
     @bot.callback_query_handler(func=lambda c: c.data == "publish_post")
@@ -22,12 +22,8 @@ def register(bot):
         try:
             # Для каналов используем полный текст без обрезки, очищенный от Markdown
             from utils.tg_utils import clean_markdown
-            send_post_with_image(
-                bot,
-                TELEGRAM_CHANNEL_ID,
-                clean_markdown(draft["text"]),
-                draft["image_bytes"]
-            )
+
+            send_post_with_image(bot, TELEGRAM_CHANNEL_ID, clean_markdown(draft["text"]), draft["image_bytes"])
         except Exception as e:
             log.exception("Ошибка публикации в канал")
             bot.answer_callback_query(call.id, "❌ Ошибка публикации в Telegram")

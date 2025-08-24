@@ -6,6 +6,7 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 HTTP_TIMEOUT = 30
 log = logging.getLogger("tg-vk-bot")
 
+
 def _openai_chat(messages, model: str) -> str:
     headers = {
         "Authorization": f"Bearer {OPENAI_API_KEY}",
@@ -26,6 +27,7 @@ def _openai_chat(messages, model: str) -> str:
         raise RuntimeError(f"OpenAI ошибка: {data.get('error', data)}")
 
     return data["choices"][0]["message"]["content"].strip()
+
 
 def generate_text(topic: str) -> str:
     prompt = (
@@ -49,6 +51,7 @@ def generate_text(topic: str) -> str:
     )
     return _openai_chat([{"role": "user", "content": prompt}], OPENAI_MODEL_TEXT)
 
+
 def generate_image_prompt(text: str) -> str:
     system_msg = (
         "Ты — помощник SMM-специалиста. На основе поста сформируй краткий промпт для генерации 1:1 изображения. "
@@ -56,9 +59,9 @@ def generate_image_prompt(text: str) -> str:
         "акцент на коже/уходе; без текста на изображении; без логотипов; как для Instagram."
     )
     return _openai_chat(
-        [{"role": "system", "content": system_msg}, {"role": "user", "content": text}],
-        OPENAI_MODEL_PROMPT
+        [{"role": "system", "content": system_msg}, {"role": "user", "content": text}], OPENAI_MODEL_PROMPT
     )
+
 
 def generate_topics() -> list[str]:
     """Генерирует 3 актуальные темы для постов на неделю"""
@@ -78,12 +81,13 @@ def generate_topics() -> list[str]:
         "Формат ответа: просто список из 3 тем, каждая с новой строки, без нумерации."
     )
     response = _openai_chat([{"role": "user", "content": prompt}], OPENAI_MODEL_TEXT)
-    topics = [topic.strip() for topic in response.split('\n') if topic.strip()]
+    topics = [topic.strip() for topic in response.split("\n") if topic.strip()]
     return topics[:3]  # Берем только первые 3 темы
+
 
 def edit_topics(topics: list[str], instruction: str) -> list[str]:
     """Редактирует темы согласно инструкции пользователя"""
-    topics_text = '\n'.join(f"{i+1}. {topic}" for i, topic in enumerate(topics))
+    topics_text = "\n".join(f"{i + 1}. {topic}" for i, topic in enumerate(topics))
     prompt = (
         f"Отредактируй темы для постов согласно инструкции. "
         f"Сохрани профессиональный подход к косметологии.\n\n"
@@ -92,5 +96,5 @@ def edit_topics(topics: list[str], instruction: str) -> list[str]:
         f"Верни 3 отредактированные темы, каждую с новой строки, без нумерации."
     )
     response = _openai_chat([{"role": "user", "content": prompt}], OPENAI_MODEL_TEXT)
-    new_topics = [topic.strip() for topic in response.split('\n') if topic.strip()]
+    new_topics = [topic.strip() for topic in response.split("\n") if topic.strip()]
     return new_topics[:3]

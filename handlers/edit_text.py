@@ -2,8 +2,7 @@
 from telebot.types import Message, CallbackQuery
 from state import user_drafts, store_lock, user_states
 from utils.openai_utils import _openai_chat
-from utils.tg_utils import truncate_caption, action_keyboard, send_post_with_image
-import io
+from utils.tg_utils import action_keyboard, send_post_with_image
 
 
 def register(bot):
@@ -11,6 +10,7 @@ def register(bot):
     def ask_edit(call: CallbackQuery):
         user_states[call.message.chat.id] = "waiting_edit_hint"
         bot.send_message(call.message.chat.id, "Опишите, как изменить текст (стиль, объём, акценты):")
+
 
 def apply_edit_instruction(bot, msg: Message):
     user_id = msg.chat.id
@@ -37,11 +37,5 @@ def apply_edit_instruction(bot, msg: Message):
     with store_lock:
         draft["text"] = new_text
 
-    send_post_with_image(
-        bot,
-        user_id,
-        new_text,
-        draft["image_bytes"],
-        reply_markup=action_keyboard()
-    )
+    send_post_with_image(bot, user_id, new_text, draft["image_bytes"], reply_markup=action_keyboard())
     user_states.pop(user_id, None)
