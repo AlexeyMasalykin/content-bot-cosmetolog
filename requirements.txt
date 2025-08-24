@@ -1,0 +1,7 @@
+python-telegram-bot==13.15       # или telebot, см. ниже
+pyTelegramBotAPI==4.13.0         # если используешь telebot (как в коде)
+requests>=2.31.0
+python-dotenv>=1.0.1
+yandex-cloud-ml-sdk==0.2.3       # SDK для генерации изображений через Yandex
+schedule>=1.2.0                  # Планировщик задач
+pytz>=2023.3                     # Работа с часовыми поясами

@@ -1,0 +1,11 @@
+# Основные зависимости для Content Bot
+pyTelegramBotAPI==4.13.0
+openai>=1.0.0
+requests==2.32.4
+python-dotenv==1.1.1
+schedule==1.2.2
+pytz==2025.2
+
+# Дополнительные зависимости
+yandexcloud>=0.228.0
+Pillow>=10.0.0

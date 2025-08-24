@@ -1,0 +1,17 @@
+[Unit]
+Description=Content Bot - Telegram Bot for Content Management
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/root/content_bot_new
+ExecStart=/usr/bin/docker start content-bot
+ExecStop=/usr/bin/docker stop content-bot
+TimeoutStartSec=0
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

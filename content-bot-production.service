@@ -1,0 +1,18 @@
+[Unit]
+Description=Content Bot - Telegram Bot for Content Management
+After=network.target
+
+[Service]
+Type=simple
+User=alex2061
+Group=alex2061
+WorkingDirectory=/root/content_bot_new
+Environment=PATH=/root/content_bot_new/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/root/content_bot_new/venv/bin/python /root/content_bot_new/bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
