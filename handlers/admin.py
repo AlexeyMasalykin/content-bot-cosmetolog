@@ -60,6 +60,8 @@ def register(bot):
         else:
             bot.send_message(chat_id, "❌ Планировщик не найден")
 
+
+
     @bot.callback_query_handler(func=lambda c: c.data == "admin_status")
     def show_status(call: CallbackQuery):
         """Показывает статус планирования"""

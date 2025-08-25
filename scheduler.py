@@ -9,7 +9,7 @@ from typing import Optional
 from dataclasses import dataclass, asdict
 import base64
 
-from state import scheduled_posts, store_lock, save_state
+from state import scheduled_posts, store_lock, save_state, save_image_to_file, load_image_from_file, delete_image_file
 from utils.openai_utils import generate_topics
 from config import TELEGRAM_CHANNEL_ID, VK_GROUP_ID
 
@@ -23,18 +23,32 @@ MSK = pytz.timezone("Europe/Moscow")
 class ScheduledPost:
     topic: str
     text: str
-    image_bytes: bytes
+    image_filename: Optional[str] = None
     publish_date: Optional[datetime] = None
-    status: str = "pending"  # pending, published_tg, published_vk, completed
+    status: str = "pending"  # pending, published_tg, published_vk, completed, failed
     post_id_tg: Optional[str] = None
     post_id_vk: Optional[str] = None
+    
+    @property
+    def image_bytes(self):
+        """Загружает изображение из файла"""
+        if self.image_filename:
+            return load_image_from_file(self.image_filename)
+        return None
+    
+    @image_bytes.setter
+    def image_bytes(self, value):
+        """Сохраняет изображение в файл"""
+        if self.image_filename:
+            delete_image_file(self.image_filename)
+        if value:
+            self.image_filename = save_image_to_file(value)
+        else:
+            self.image_filename = None
 
     def to_dict(self):
         """Конвертирует в словарь для сохранения в JSON"""
         data = asdict(self)
-        # Кодируем bytes в base64 для JSON
-        if isinstance(self.image_bytes, bytes):
-            data["image_bytes"] = base64.b64encode(self.image_bytes).decode("utf-8")
         if self.publish_date:
             data["publish_date"] = self.publish_date.isoformat()
         return data
@@ -42,11 +56,22 @@ class ScheduledPost:
     @classmethod
     def from_dict(cls, data):
         """Создает объект из словаря"""
+        # Обрабатываем старый формат с image_bytes
         if "image_bytes" in data and isinstance(data["image_bytes"], str):
-            data["image_bytes"] = base64.b64decode(data["image_bytes"].encode("utf-8"))
+            # Конвертируем старый формат base64 в файл
+            image_data = base64.b64decode(data["image_bytes"].encode("utf-8"))
+            data["image_filename"] = save_image_to_file(image_data)
+            del data["image_bytes"]
+        
         if "publish_date" in data and data["publish_date"]:
             data["publish_date"] = datetime.fromisoformat(data["publish_date"])
         return cls(**data)
+    
+    def cleanup_image(self):
+        """Удаляет файл изображения"""
+        if self.image_filename:
+            delete_image_file(self.image_filename)
+            self.image_filename = None
 
 
 class ContentScheduler:
@@ -157,68 +182,127 @@ class ContentScheduler:
             else:
                 post = post_data
 
-            if post.status != "pending":
-                log.info(f"Post already processed: {post.status}")
+            if post.status == "completed":
+                log.info(f"Post already completed: {post.topic}")
+                # Удаляем завершенный пост из очереди
+                with store_lock:
+                    scheduled_posts["approved_posts"] = posts_queue[1:]
+                    save_state()
                 return
 
             log.info(f"Publishing post: {post.topic}")
 
-            # Публикуем в Telegram с картинкой
-            try:
-                from utils.tg_utils import send_post_with_image, clean_markdown
+            # Публикуем в Telegram с картинкой (если еще не опубликовано)
+            telegram_success = bool(post.post_id_tg)  # Уже опубликовано если есть post_id_tg
+            if not telegram_success:
+                try:
+                    from utils.tg_utils import send_post_with_image, clean_markdown
 
-                tg_msg = send_post_with_image(
-                    self.bot, TELEGRAM_CHANNEL_ID, clean_markdown(post.text), post.image_bytes
-                )
-                post.post_id_tg = str(tg_msg.message_id)
-                post.status = "published_tg"
-                log.info("Published to Telegram")
+                    tg_msg = send_post_with_image(
+                        self.bot, TELEGRAM_CHANNEL_ID, clean_markdown(post.text), post.image_bytes
+                    )
+                    post.post_id_tg = str(tg_msg.message_id)
+                    telegram_success = True
+                    log.info("Published to Telegram")
 
-            except Exception as e:
-                log.exception("Error publishing to Telegram")
-                if self.admin_chat_id:
-                    self.bot.send_message(self.admin_chat_id, f"❌ Ошибка публикации в Telegram: {e}")
+                except Exception as e:
+                    log.exception("Error publishing to Telegram")
+                    if self.admin_chat_id:
+                        self.bot.send_message(self.admin_chat_id, f"❌ Ошибка публикации в Telegram: {e}")
+            else:
+                log.info("Already published to Telegram, skipping")
 
-            # Публикуем в VK с картинкой (обязательно)
-            try:
-                from utils.vk_utils import vk_publish_with_image_required, vk_post_url
-                from utils.tg_utils import smart_vk_text
+            # Публикуем в VK с картинкой (если еще не опубликовано)
+            vk_success = bool(post.post_id_vk)  # Уже опубликовано если есть post_id_vk
+            vk_url = None
+            if not vk_success:
+                try:
+                    from utils.vk_utils import vk_publish_with_image_required, vk_post_url
+                    from utils.tg_utils import smart_vk_text
 
-                # Публикация в VK с картинкой и умной обработкой текста
-                post_id_vk = vk_publish_with_image_required(VK_GROUP_ID, post.image_bytes, smart_vk_text(post.text))
-                post.post_id_vk = str(post_id_vk)
+                    # Публикация в VK с картинкой и умной обработкой текста
+                    post_id_vk = vk_publish_with_image_required(VK_GROUP_ID, post.image_bytes, smart_vk_text(post.text))
+                    post.post_id_vk = str(post_id_vk)
+                    vk_success = True
+
+                    # Формируем ссылку на пост в VK
+                    vk_url = vk_post_url(VK_GROUP_ID, post_id_vk)
+                    log.info(f"Published to VK: {vk_url}")
+
+                except Exception as e:
+                    log.exception("Error publishing to VK")
+                    if self.admin_chat_id:
+                        self.bot.send_message(self.admin_chat_id, f"❌ Ошибка публикации в VK: {e}")
+            else:
+                log.info("Already published to VK, skipping")
+                # Получаем URL для уже опубликованного поста
+                try:
+                    from utils.vk_utils import vk_post_url
+                    vk_url = vk_post_url(VK_GROUP_ID, int(post.post_id_vk))
+                except Exception:
+                    vk_url = "опубликован"
+
+            # Определяем финальный статус поста
+            if telegram_success and vk_success:
                 post.status = "completed"
-
-                # Формируем ссылку на пост в VK
-                vk_url = vk_post_url(VK_GROUP_ID, post_id_vk)
-                log.info(f"Published to VK: {vk_url}")
-
-                # Уведомляем администратора
+                # Уведомляем администратора об успешной публикации
                 if self.admin_chat_id:
                     self.bot.send_message(
                         self.admin_chat_id,
-                        f"✅ Пост опубликован:\n"
+                        f"✅ Пост опубликован во всех соцсетях:\n"
                         f"📢 Telegram: опубликован\n"
                         f"🔗 VK: {vk_url}\n"
                         f"📝 Тема: {post.topic}",
                     )
-
-            except Exception as e:
-                log.exception("Error publishing to VK")
+            elif telegram_success:
+                post.status = "published_tg"
                 if self.admin_chat_id:
-                    self.bot.send_message(self.admin_chat_id, f"❌ Ошибка публикации в VK: {e}")
+                    self.bot.send_message(
+                        self.admin_chat_id,
+                        f"⚠️ Пост опубликован только в Telegram:\n"
+                        f"📢 Telegram: опубликован\n"
+                        f"❌ VK: ошибка публикации\n"
+                        f"📝 Тема: {post.topic}",
+                    )
+            elif vk_success:
+                post.status = "published_vk"
+                if self.admin_chat_id:
+                    self.bot.send_message(
+                        self.admin_chat_id,
+                        f"⚠️ Пост опубликован только в VK:\n"
+                        f"❌ Telegram: ошибка публикации\n"
+                        f"🔗 VK: {vk_url}\n"
+                        f"📝 Тема: {post.topic}",
+                    )
+            else:
+                post.status = "failed"
+                if self.admin_chat_id:
+                    self.bot.send_message(
+                        self.admin_chat_id,
+                        f"❌ Не удалось опубликовать пост ни в одной соцсети:\n"
+                        f"📝 Тема: {post.topic}",
+                    )
 
             # Обновляем очередь постов
             with store_lock:
                 posts_queue[0] = post.to_dict()
                 if post.status == "completed":
+                    # Удаляем изображение только после успешной публикации в обеих соцсетях
+                    post.cleanup_image()
                     # Удаляем опубликованный пост из очереди
                     scheduled_posts["approved_posts"] = posts_queue[1:]
                     # Добавляем в архив
                     if "published_posts" not in scheduled_posts:
                         scheduled_posts["published_posts"] = []
                     scheduled_posts["published_posts"].append(post.to_dict())
+                elif post.status == "failed":
+                    # Оставляем неудачные посты в очереди для повторной попытки позже
+                    # Но перемещаем в конец очереди
+                    scheduled_posts["approved_posts"] = posts_queue[1:] + [post.to_dict()]
+                    log.info("Failed post moved to end of queue for retry")
                 else:
+                    # Посты с частичной публикацией (published_tg/published_vk) остаются в начале очереди
+                    # для повторной попытки недостающей платформы
                     scheduled_posts["approved_posts"] = posts_queue
                 save_state()
 

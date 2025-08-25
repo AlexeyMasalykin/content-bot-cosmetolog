@@ -156,3 +156,4 @@ Thumbs.db
 *.bak
 *.backup
 *.old
+temp_images/
