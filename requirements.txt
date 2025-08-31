@@ -1,8 +1,27 @@
-python-telegram-bot==13.15       # или telebot, см. ниже
-pyTelegramBotAPI==4.13.0         # если используешь telebot (как в коде)
-requests>=2.31.0
-python-dotenv>=1.0.1
-yandex-cloud-ml-sdk==0.2.3       # SDK для генерации изображений через Yandex
-schedule>=1.2.0                  # Планировщик задач
-pytz>=2023.3                     # Работа с часовыми поясами
-pytest>=8.0.0                    # Тестирование
+# Основные библиотеки для работы бота
+pyTelegramBotAPI==4.13.0
+requests==2.32.4
+python-dotenv==1.1.1
+schedule==1.2.2
+pytz==2025.2
+
+# Yandex Cloud ML SDK для генерации изображений
+yandex-cloud-ml-sdk==0.2.3
+yandexcloud==0.353.0
+
+# OpenAI для генерации текста
+openai==1.100.2
+
+# Дополнительные зависимости
+pillow==11.3.0
+protobuf==5.29.5
+grpcio==1.74.0
+grpcio-tools==1.71.2
+
+# Тестирование
+pytest==8.4.1
+
+# Форматирование кода (опционально)
+black==25.1.0
+flake8==7.3.0
+autopep8==2.3.2
