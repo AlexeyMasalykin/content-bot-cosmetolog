@@ -13,6 +13,8 @@ def test_imports():
     """Тест импорта основных модулей"""
     try:
         import state
+        import config
+        import scheduler
         # import bot  # Пропускаем bot.py, так как он требует переменные окружения
         assert True, "Основные модули импортируются успешно"
     except ImportError as e:
@@ -45,6 +47,16 @@ def test_state_functions():
     assert callable(state.load_state), "load_state должна быть функцией"
 
 
+def test_scheduler_functions():
+    """Тест функций планировщика"""
+    import scheduler
+    
+    # Проверяем, что основные функции существуют
+    assert hasattr(scheduler, 'init_scheduler'), "Функция init_scheduler должна существовать"
+    assert hasattr(scheduler, 'ContentScheduler'), "Класс ContentScheduler должен существовать"
+    assert hasattr(scheduler, 'ScheduledPost'), "Класс ScheduledPost должен существовать"
+
+
 def test_basic_math():
     """Простой тест математики для проверки pytest"""
     assert 2 + 2 == 4, "Базовая математика должна работать"
@@ -56,5 +68,6 @@ if __name__ == "__main__":
     test_imports()
     test_config_structure()
     test_state_functions()
+    test_scheduler_functions()
     test_basic_math()
     print("Все тесты прошли успешно!")
