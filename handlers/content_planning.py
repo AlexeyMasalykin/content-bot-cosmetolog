@@ -302,8 +302,9 @@ def _generate_posts_for_topics(bot, chat_id: int):
                 from scheduler import ScheduledPost
 
                 post = ScheduledPost(
-                    topic=topic, text=text, image_bytes=image_bytes, publish_date=None, status="pending"
+                    topic=topic, text=text, publish_date=None, status="pending"
                 )
+                post.image_bytes = image_bytes
                 posts.append(post.to_dict())
 
             except Exception as e:
